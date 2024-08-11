@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 from threading import Semaphore
 
-version = 'v0.3.2'
+version = 'v0.3.3'
 
 '''
 jxl-migrate - Convert images to JPEG XL (JXL) format
@@ -82,6 +82,23 @@ def convert_webp_to_temporary_png(webp_filename):
         os.utime(temporary_png_filename, (time.time(), os.path.getmtime(webp_filename)))
         return temporary_png_filename
 
+def convert_bmp_to_temporary_png(bmp_filename):
+    temporary_png_filename = tempfile.NamedTemporaryFile(prefix='jxl-migrate-cli-', suffix='.png').name
+
+    print_thread_safe("Converting " + bmp_filename + " to a temporary PNG " + temporary_png_filename)
+
+    proc = subprocess.run(args=[
+        'magick',
+        bmp_filename,
+        temporary_png_filename
+    ], capture_output=True)
+
+    if proc.returncode != 0 or not os.path.exists(temporary_png_filename):
+        return None
+    else:
+        os.utime(temporary_png_filename, (time.time(), os.path.getmtime(bmp_filename)))
+        return temporary_png_filename
+
 
 def handle_file(filename, root):
     global filesize_before_conversion
@@ -98,10 +115,18 @@ def handle_file(filename, root):
     lossy = False
     losslessjpeg = False
     decoded_png_filename = None
-    if extension not in ['jpg', 'jpeg', 'gif', 'png', 'apng', 'webp']:
+
+    supported_extensions = ['jpg', 'jpeg', 'gif', 'png', 'apng', 'webp', 'bmp']
+
+    if extension not in supported_extensions:
         if extension != 'jxl':
             print_thread_safe('Not supported: ' + fullpath)
         return
+
+    if extension in arguments['ignore_extensions']:
+        print_thread_safe('Ignoring ' + fullpath)
+        return
+
     filename_without_extension = '.'.join(filename.split('.')[:-1])
     jxl_filename = os.path.join(root, filename_without_extension) + '.jxl'
     if not arguments['force_overwrite']:
@@ -113,6 +138,15 @@ def handle_file(filename, root):
         losslessjpeg = not arguments['lossyjpg']
     elif extension in ['gif']:
         lossy = arguments['lossygif']
+    elif extension in ['png']:
+        lossy = arguments['lossypng']
+    elif extension in ['bmp']:
+        decoded_png_filename = convert_bmp_to_temporary_png(fullpath)
+        if decoded_png_filename is None:
+            return
+        if arguments['lossybmp']:
+            lossy = True
+        fullpath = decoded_png_filename
     elif extension in ['webp']:
         decoded_png_filename = convert_webp_to_temporary_png(fullpath)
         if decoded_png_filename is None:
@@ -175,9 +209,12 @@ def run():
         'delete': False,
         'lossyjpg': False,
         'lossywebp': False,
+        'lossypng': False,
+        'lossybmp': False,
         'lossygif': False,
         'force_overwrite': False,
         'source': None,
+        'ignore_extensions': [],
         'cjxl_extra_args': [],
         'jobs': cpu_count(),
     }
@@ -196,6 +233,10 @@ def run():
                 arguments['lossywebp'] = True
             elif arg == '--lossygif':
                 arguments['lossygif'] = True
+            elif arg == '--lossypng':
+                arguments['lossypng'] = True
+            elif arg == '--lossybmp':
+                arguments['lossybmp'] = True
             elif arg == '--force-overwrite':
                 arguments['force_overwrite'] = True
             elif arg.startswith('--jobs='):
@@ -209,6 +250,8 @@ def run():
                     exit(1)
             elif arg.startswith('--cjxl-extra-args='):
                 arguments['cjxl_extra_args'] = arg.split('=')[1].split(' ')
+            elif arg.startswith('--ignore-formats='):
+                arguments['ignore_extensions'] = arg.split('=')[1].split(',')
             else:
                 print('Unrecognized flag: ' + arg)
                 exit(1)
@@ -263,7 +306,10 @@ def print_help():
     print('--lossyjpg: convert JPEG files lossily (-d 1) (default FALSE)')
     print('--lossywebp: convert lossless WebP lossily (-d 1) (default FALSE)')
     print('--lossygif: convert GIF lossily (-d 1) (default FALSE)')
+    print('--lossypng: convert PNG lossily (-d 1) (default FALSE)')
+    print('--lossybmp: convert BMP lossily (-d 1) (default FALSE)')
     print('--force-overwrite: perform conversion even if JXL file already exists')
+    print('--ignore-formats: comma-separated list of file extensions to ignore, e.g. --ignore-formats=jpg,png')
     print('--jobs: number of jobs (cjxl processes) to use (defaults to CPU core count), e.g. --jobs=8')
     print('--cjxl-extra-args: Additional parameters to pass to jxl, e.g. --cjxl-extra-args="-e 8" to set cjxl '
           'effort to 8')

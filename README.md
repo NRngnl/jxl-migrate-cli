@@ -10,7 +10,8 @@ In case the conversion of an image is successful, the original image can be dele
 `jxl-migrate-cli` will try to do the following:
 
 * Convert *JPEG and JPG* files into *lossless transcoded or lossy JXL*
-* Convert *PNG* files into *lossless JXL*
+* Convert *PNG* files into *lossless or lossy JXL*
+* Convert *BMP* files into *lossless or lossy JXL*
 * Convert *APNG* files into *lossless JXL*
 * Convert *lossless WebP* into *lossless or lossy JXL*
 * Convert *lossy WebP* into *lossy JXL* (`-d 1`)
@@ -32,6 +33,7 @@ If desired, the original source image can be deleted automatically.
 * The `webpinfo` binary (to check if a WebP is lossless or lossy so that it can convert the file accordingly)
 * The `cjxl` binary (to actually convert images)
 * The `dwebp` binary (to decode WebP images into PNG images first because `cjxl` does not support WebP directly)
+* The `magick` binary (to decode BMP images into PNG images first because `cjxl` does not support BMP directly)
 
 ## Usage
 
@@ -40,7 +42,7 @@ Just run the script on Python while providing the required parameters and it wil
 ### Valid arguments
 
 ```sh
-python jxl-migrate-cli.py [directory] [--delete] [--lossyjpg] [--lossywebp] [--lossygif]
+python jxl-migrate-cli.py [directory] [--delete] [--lossyjpg] [--lossywebp] [--lossygif] [--lossypng] [--lossybmp] [--force-overwrite] [--jobs=8] [--cjxl-extra-args="-e 8"] [--ignore-formats=gif,png]
 ```
 
 --**delete**: delete original source files if conversion succeeded (default FALSE)
@@ -51,11 +53,17 @@ python jxl-migrate-cli.py [directory] [--delete] [--lossyjpg] [--lossywebp] [--l
 
 --**lossygif**: convert GIF lossily (-d 1) (default FALSE)
 
+--**lossypng**: convert PNG lossily (-d 1) (default FALSE)
+
+--**lossybmp**: convert BMP lossily (-d 1) (default FALSE)
+
 --**force-overwrite**: perform conversion even if JXL file already exists
 
 --**jobs**: number of jobs (cjxl processes) to use (defaults to CPU core count), e.g. --jobs=8
 
 --**cjxl-extra-args**: Additional parameters to pass to jxl, e.g. --cjxl-extra-args="-e 8" to set cjxl effort to 8
+
+--**ignore-formats**: comma-separated list of file extensions to ignore, e.g. --ignore-formats=gif,png
 
 ### Example
 
